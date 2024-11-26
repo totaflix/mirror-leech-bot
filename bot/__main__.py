@@ -64,36 +64,37 @@ from .modules import (
 
 
 @new_task
-async def stats(_, message):
-    if await aiopath.exists(".git"):
-        last_commit = await cmd_exec(
-            "git log -1 --date=short --pretty=format:'%cd <b>From</b> %cr'", True
-        )
-        last_commit = last_commit[0]
+@new_task
+async def start(client, message):
+    buttons = ButtonMaker()
+    buttons.ubutton(BotTheme('ST_BN1_NAME'), BotTheme('ST_BN1_URL'))
+    buttons.ubutton(BotTheme('ST_BN2_NAME'), BotTheme('ST_BN2_URL'))
+    reply_markup = buttons.build_menu(2)
+    if len(message.command) > 1 and message.command[1] == "wzmlx":
+        await deleteMessage(message)
+    elif len(message.command) > 1 and config_dict['TOKEN_TIMEOUT']:
+        userid = message.from_user.id
+        encrypted_url = message.command[1]
+        input_token, pre_uid = (b64decode(encrypted_url.encode()).decode()).split('&&')
+        if int(pre_uid) != userid:
+            return await sendMessage(message, BotTheme('OWN_TOKEN_GENERATE'))
+        data = user_data.get(userid, {})
+        if 'token' not in data or data['token'] != input_token:
+            return await sendMessage(message, BotTheme('USED_TOKEN'))
+        elif config_dict['LOGIN_PASS'] is not None and data['token'] == config_dict['LOGIN_PASS']:
+            return await sendMessage(message, BotTheme('LOGGED_PASSWORD'))
+        buttons.ibutton(BotTheme('ACTIVATE_BUTTON'), f'pass {input_token}', 'header')
+        reply_markup = buttons.build_menu(2)
+        msg = BotTheme('TOKEN_MSG', token=input_token, validity=get_readable_time(int(config_dict["TOKEN_TIMEOUT"])))
+        return await sendMessage(message, msg, reply_markup)
+    elif await CustomFilters.authorized(client, message):
+        start_string = BotTheme('ST_MSG', help_command=f"/{BotCommands.HelpCommand}")
+        await sendMessage(message, start_string, reply_markup, photo='IMAGES')
+    elif config_dict['BOT_PM']:
+        await sendMessage(message, BotTheme('ST_BOTPM'), reply_markup, photo='IMAGES')
     else:
-        last_commit = "No UPSTREAM_REPO"
-    total, used, free, disk = disk_usage("/")
-    swap = swap_memory()
-    memory = virtual_memory()
-    stats = (
-        f"<b>Commit Date:</b> {last_commit}\n\n"
-        f"<b>Bot Uptime:</b> {get_readable_time(time() - botStartTime)}\n"
-        f"<b>OS Uptime:</b> {get_readable_time(time() - boot_time())}\n\n"
-        f"<b>Total Disk Space:</b> {get_readable_file_size(total)}\n"
-        f"<b>Used:</b> {get_readable_file_size(used)} | <b>Free:</b> {get_readable_file_size(free)}\n\n"
-        f"<b>Upload:</b> {get_readable_file_size(net_io_counters().bytes_sent)}\n"
-        f"<b>Download:</b> {get_readable_file_size(net_io_counters().bytes_recv)}\n\n"
-        f"<b>CPU:</b> {cpu_percent(interval=0.5)}%\n"
-        f"<b>RAM:</b> {memory.percent}%\n"
-        f"<b>DISK:</b> {disk}%\n\n"
-        f"<b>Physical Cores:</b> {cpu_count(logical=False)}\n"
-        f"<b>Total Cores:</b> {cpu_count(logical=True)}\n\n"
-        f"<b>SWAP:</b> {get_readable_file_size(swap.total)} | <b>Used:</b> {swap.percent}%\n"
-        f"<b>Memory Total:</b> {get_readable_file_size(memory.total)}\n"
-        f"<b>Memory Free:</b> {get_readable_file_size(memory.available)}\n"
-        f"<b>Memory Used:</b> {get_readable_file_size(memory.used)}\n"
-    )
-    await send_message(message, stats)
+        await sendMessage(message, BotTheme('ST_UNAUTH'), reply_markup, photo='IMAGES')
+    await DbManger().update_pm_users(message.from_user.id)
 
 
 @new_task
